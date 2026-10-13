@@ -176,6 +176,91 @@ public class FapelloClient(
         return out
     }
 
+    // -------------------------------------------------------------- search --
+
+    /**
+     * The site's own search (the endpoint its results page calls with
+     * `fetch`): creators matching [query], offset-paged, 30 at a time.
+     */
+    public fun searchCreators(query: String, limit: Int = 30, offset: Int = 0): SearchResult<CreatorRef> {
+        val q = query.trim()
+        if (q.isEmpty()) return SearchResult(emptyList(), 0, false, offset)
+        val response = get(FapelloUrls.search(base, q, "models", limit, offset), ajax = true)
+        if (!response.isSuccessful || response.body.isNullOrBlank()) {
+            return SearchResult(emptyList(), 0, false, offset)
+        }
+        return FapelloParser.parseSearchCreators(response.body!!, base)
+    }
+
+    /** Same endpoint, user-post results (`type=posts`). */
+    public fun searchPosts(query: String, limit: Int = 30, offset: Int = 0): SearchResult<UserPost> {
+        val q = query.trim()
+        if (q.isEmpty()) return SearchResult(emptyList(), 0, false, offset)
+        val response = get(FapelloUrls.search(base, q, "posts", limit, offset), ajax = true)
+        if (!response.isSuccessful || response.body.isNullOrBlank()) {
+            return SearchResult(emptyList(), 0, false, offset)
+        }
+        return FapelloParser.parseSearchPosts(response.body!!, base)
+    }
+
+    // ---------------------------------------------------------------- tags --
+
+    /** The /tags/ index: the tags the site currently lists. */
+    public fun tags(): List<TagRef> {
+        val response = get(FapelloUrls.tags(base))
+        if (!response.isSuccessful || response.body.isNullOrBlank()) return emptyList()
+        return FapelloParser.parseTags(response.body!!, base)
+    }
+
+    /** Tag autocomplete, as the tag pages themselves do it. */
+    public fun tagSuggestions(query: String): List<TagRef> {
+        val q = query.trim()
+        if (q.isEmpty()) return emptyList()
+        val response = get(FapelloUrls.tagSuggest(base, q), ajax = true)
+        if (!response.isSuccessful || response.body.isNullOrBlank()) return emptyList()
+        return FapelloParser.parseTagSuggestions(response.body!!)
+    }
+
+    /**
+     * One page of a tag's media via `/ajax/tags/{slug}/page-N/`. An empty
+     * fragment (or the `tags-more:0` marker) is how the site says "no more".
+     */
+    public fun tagMedia(slug: String, page: Int): PageResult<MediaItem> {
+        val url = FapelloUrls.tagAjax(base, slug, page)
+        val response = get(url, ajax = true)
+        if (!response.isSuccessful || response.body.isNullOrBlank()) {
+            return PageResult(emptyList(), page, false, "page $page → HTTP ${response.code} (end of tag)")
+        }
+        val items = FapelloParser.parseTagMedia(response.body!!, slug, base)
+        val hasMore = items.isNotEmpty() && !response.body!!.contains("tags-more:0")
+        return PageResult(items, page, hasMore, "page $page → ${items.size} items")
+    }
+
+    /** Every media item under a tag: walks the ajax pages until one ends it. */
+    public fun tagMediaAll(
+        slug: String,
+        maxPages: Int = Int.MAX_VALUE,
+        onPage: ((page: Int, found: Int, total: Int) -> Unit)? = null
+    ): List<MediaItem> {
+        val seen = LinkedHashSet<String>()
+        val out = ArrayList<MediaItem>()
+        var page = 1
+        while (page <= maxPages) {
+            val result = tagMedia(slug, page)
+            var fresh = 0
+            for (item in result.items) {
+                if (seen.add(item.pageUrl)) {
+                    out.add(item)
+                    fresh++
+                }
+            }
+            onPage?.invoke(page, fresh, out.size)
+            if (!result.hasMore || fresh == 0) break
+            page++
+        }
+        return out
+    }
+
     // ----------------------------------------------------------- user posts --
 
     public fun userPosts(page: Int): PageResult<UserPost> {
@@ -351,6 +436,18 @@ public class FapelloClient(
             probe("Post detail · /post/${firstPost.id}/${firstPost.slug}/", firstPost.url) { html ->
                 "${FapelloParser.parseUserPostPage(html, firstPost.url, base, firstPost.id).size} media"
             }
+        }
+
+        probe("Search creators · /search_v2/?ajax=1&type=models", FapelloUrls.search(base, "a", "models", 5, 0), true) { json ->
+            val result = FapelloParser.parseSearchCreators(json, base)
+            "${result.items.size} of ${result.total} creators"
+        }
+        probe("Search posts · /search_v2/?ajax=1&type=posts", FapelloUrls.search(base, "a", "posts", 5, 0), true) { json ->
+            val result = FapelloParser.parseSearchPosts(json, base)
+            "${result.items.size} of ${result.total} posts"
+        }
+        probe("Tags · /tags/", FapelloUrls.tags(base)) { html ->
+            "${FapelloParser.parseTags(html, base).size} tags"
         }
         return out
     }

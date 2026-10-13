@@ -123,6 +123,29 @@ public class DownloadManager(
         }
     }
 
+    /** Crawl every page of a tag, then queue all of it (owner: tag-{slug}). */
+    public fun enqueueTag(tagSlug: String, tagName: String) {
+        val key = "tag:$tagSlug"
+        if (sweepJobs.containsKey(key)) return
+        setSweep(SweepStatus(key, "#$tagName", "crawling…", 0, false))
+        sweepJobs[key] = scope.launch {
+            try {
+                val client = Graph.client()
+                val media = client.tagMediaAll(tagSlug) { page, fresh, total ->
+                    setSweep(SweepStatus(key, "#$tagName", "page $page · +$fresh", total, false))
+                }
+                db.enqueue(media, "tag-$tagSlug")
+                refresh()
+                startService()
+                setSweep(SweepStatus(key, "#$tagName", "queued ${media.size}", media.size, true))
+            } catch (e: Exception) {
+                setSweep(SweepStatus(key, "#$tagName", "failed: ${e.message}", 0, true))
+            } finally {
+                sweepJobs.remove(key)
+            }
+        }
+    }
+
     /** The heavy one: walk the creator feeds and queue every creator found. */
     public fun enqueueSiteSweep(kind: FeedKind, feedPages: Int) {
         val key = "sweep:${kind.name}"

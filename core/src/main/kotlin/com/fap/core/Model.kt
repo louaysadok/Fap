@@ -65,6 +65,21 @@ public data class UserPost(
     val mediaCountHint: Int? = null
 )
 
+/** One tag from /tags/, e.g. slug "big-tits-pov", name "Big Tits Pov". */
+public data class TagRef(
+    val slug: String,
+    val name: String
+)
+
+/** One page of site search results (`/search_v2/?ajax=1…`, offset paged). */
+public data class SearchResult<T>(
+    val items: List<T>,
+    /** Total matches on the site, as reported by the endpoint. */
+    val total: Int,
+    val hasMore: Boolean,
+    val offset: Int
+)
+
 public data class PageResult<T>(
     val items: List<T>,
     val page: Int,

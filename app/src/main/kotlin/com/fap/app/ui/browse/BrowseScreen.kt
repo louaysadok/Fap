@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
@@ -69,7 +71,8 @@ public fun BrowseScreen(
     onOpenCreator: (String) -> Unit,
     onOpenPost: (String, String) -> Unit,
     onOpenViewer: () -> Unit,
-    onOpenFollowing: () -> Unit
+    onOpenFollowing: () -> Unit,
+    onOpenTags: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     val settings by Graph.settings.state.collectAsState()
@@ -97,17 +100,29 @@ public fun BrowseScreen(
         viewModel.consumeToast()
     }
 
-    val creators = state.creators.filter {
-        state.query.isBlank() ||
-            it.name.contains(state.query, ignoreCase = true) ||
-            it.slug.contains(state.query, ignoreCase = true)
+    // In search mode these are the site's own results (its matching is
+    // fuzzy, so they must NOT be re-filtered by the query text). Otherwise
+    // the box just narrows whatever feed pages are already loaded.
+    val creators = if (state.inSearch) {
+        state.searchCreators
+    } else {
+        state.creators.filter {
+            state.query.isBlank() ||
+                it.name.contains(state.query, ignoreCase = true) ||
+                it.slug.contains(state.query, ignoreCase = true)
+        }
     }
-    val posts = state.posts.filter {
-        state.query.isBlank() ||
-            it.title.contains(state.query, ignoreCase = true) ||
-            (it.poster ?: "").contains(state.query, ignoreCase = true) ||
-            it.slug.contains(state.query, ignoreCase = true)
+    val posts = if (state.inSearch) {
+        state.searchPosts
+    } else {
+        state.posts.filter {
+            state.query.isBlank() ||
+                it.title.contains(state.query, ignoreCase = true) ||
+                (it.poster ?: "").contains(state.query, ignoreCase = true) ||
+                it.slug.contains(state.query, ignoreCase = true)
+        }
     }
+    val hasContent = if (state.mode == BrowseMode.CREATORS) creators.isNotEmpty() else posts.isNotEmpty()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -129,10 +144,16 @@ public fun BrowseScreen(
                 singleLine = true,
                 placeholder = { Text("Search, or paste a link") },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { viewModel.openRaw(state.query) }),
+                keyboardActions = KeyboardActions(onSearch = { viewModel.submitSearch() }),
                 trailingIcon = {
-                    IconButton(onClick = { viewModel.openRaw(state.query) }) {
-                        Icon(Icons.Default.Search, contentDescription = "Open")
+                    if (state.inSearch) {
+                        IconButton(onClick = viewModel::exitSearch) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search")
+                        }
+                    } else {
+                        IconButton(onClick = viewModel::submitSearch) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
                     }
                 }
             )
@@ -170,13 +191,29 @@ public fun BrowseScreen(
                     },
                     label = { Text("Following ★ ${state.favoritesCount}", maxLines = 1) }
                 )
+                Spacer(modifier = Modifier.width(6.dp))
+                FilterChip(
+                    selected = false,
+                    onClick = onOpenTags,
+                    label = { Text("Tags #", maxLines = 1) }
+                )
             }
         }
 
         Box(modifier = Modifier.weight(1f)) {
             when {
-                state.loading -> LoadingRow("Loading ${state.mode.name.lowercase()}…")
-                state.error != null && state.creators.isEmpty() && state.posts.isEmpty() ->
+                state.inSearch && state.searchLoading && !hasContent ->
+                    LoadingRow("Searching Fapello for \"${state.searchedQuery}\"…")
+                state.inSearch && state.searchError != null && !hasContent ->
+                    MessageCard(state.searchError ?: "Search failed") {
+                        androidx.compose.material3.Button(onClick = viewModel::submitSearch) { Text("Retry") }
+                    }
+                state.inSearch && !state.searchLoading && !hasContent ->
+                    MessageCard("No ${if (state.mode == BrowseMode.CREATORS) "creators" else "posts"} found for \"${state.searchedQuery}\" on Fapello.") {
+                        androidx.compose.material3.TextButton(onClick = viewModel::exitSearch) { Text("Back to browse") }
+                    }
+                !state.inSearch && state.loading -> LoadingRow("Loading ${state.mode.name.lowercase()}…")
+                !state.inSearch && state.error != null && state.creators.isEmpty() && state.posts.isEmpty() ->
                     MessageCard(state.error ?: "Something went wrong") {
                         androidx.compose.material3.Button(onClick = viewModel::reload) { Text("Retry") }
                     }
@@ -188,6 +225,11 @@ public fun BrowseScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        if (state.inSearch || state.query.isNotBlank()) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                SearchBanner(state = state, onSubmitSearch = viewModel::submitSearch)
+                            }
+                        }
                         itemsIndexed(creators, key = { _, item -> item.slug }) { index, creator ->
                             CreatorCard(
                                 creator = creator,
@@ -195,15 +237,24 @@ public fun BrowseScreen(
                                 onClick = { onOpenCreator(creator.slug) },
                                 onDownload = { viewModel.downloadCreator(creator) }
                             )
-                            if (index >= creators.size - 6) viewModel.loadMore()
+                            if (index >= creators.size - 6) {
+                                if (state.inSearch) viewModel.loadMoreSearch() else viewModel.loadMore()
+                            }
                         }
-                        if (state.loadingMore || (!state.endReached && creators.isNotEmpty())) {
-                            item { LoadingRow("Loading more…") }
+                        if (if (state.inSearch) state.searchLoading && creators.isNotEmpty()
+                            else state.loadingMore || (!state.endReached && creators.isNotEmpty())
+                        ) {
+                            item(span = { GridItemSpan(maxLineSpan) }) { LoadingRow("Loading more…") }
                         }
                     }
                 }
                 else -> {
                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
+                        if (state.inSearch || state.query.isNotBlank()) {
+                            item {
+                                SearchBanner(state = state, onSubmitSearch = viewModel::submitSearch)
+                            }
+                        }
                         itemsIndexed(posts, key = { _, item -> item.id }) { index, post ->
                             PostCard(
                                 post = post,
@@ -211,14 +262,42 @@ public fun BrowseScreen(
                                 onClick = { onOpenPost(post.id, post.slug) },
                                 onDownload = { viewModel.downloadPost(post) }
                             )
-                            if (index >= posts.size - 4) viewModel.loadMore()
+                            if (index >= posts.size - 4) {
+                                if (state.inSearch) viewModel.loadMoreSearch() else viewModel.loadMore()
+                            }
                         }
-                        if (state.loadingMore || (!state.endReached && posts.isNotEmpty())) {
+                        if (if (state.inSearch) state.searchLoading && posts.isNotEmpty()
+                            else state.loadingMore || (!state.endReached && posts.isNotEmpty())
+                        ) {
                             item { LoadingRow("Loading more…") }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SearchBanner(state: BrowseUiState, onSubmitSearch: () -> Unit) {
+    if (state.inSearch) {
+        Text(
+            "${state.searchTotal} result${if (state.searchTotal == 1) "" else "s"} for \"${state.searchedQuery}\"",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 6.dp)
+        )
+    } else {
+        androidx.compose.material3.Button(
+            onClick = onSubmitSearch,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 6.dp)
+        ) {
+            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+            Text(" Search Fapello for \"${state.query.trim()}\"", maxLines = 1)
         }
     }
 }

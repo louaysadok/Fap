@@ -329,6 +329,159 @@ public object FapelloParser {
         return out.toList()
     }
 
+    // -------------------------------------------------------------- search --
+
+    private val TAG_LINK = Regex("""^https?://[^/]+/tags/([^/?#]+)/?$""", RegexOption.IGNORE_CASE)
+    private val CREATOR_MEDIA_LINK_ANY = Regex("""^https?://[^/]+/([^/]+)/(\d+)/?$""", RegexOption.IGNORE_CASE)
+
+    /**
+     * `/search_v2/?ajax=1&q=…&type=models…` JSON -> creator results.
+     * Fields per item: id, name, url, avatar, preview, content_count, likes.
+     */
+    public fun parseSearchCreators(json: String, base: String): SearchResult<CreatorRef> {
+        val root = JsonParser.parse(json).asJsonObject() ?: return SearchResult(emptyList(), 0, false, 0)
+        val list = root.asJsonObject()?.let { it["results"].asJsonObject()?.jsonList("models") } ?: emptyList<Any?>()
+        val out = ArrayList<CreatorRef>()
+        for (entry in list) {
+            val item = entry.asJsonObject() ?: continue
+            val url = item.jsonString("url") ?: continue
+            val slug = url.trimEnd('/').substringAfterLast('/').takeIf { it.isNotBlank() } ?: continue
+            if (!FapelloUrls.isCreatorSlug(slug)) continue
+            out.add(
+                CreatorRef(
+                    slug = slug,
+                    name = item.jsonString("name")?.takeIf { it.isNotBlank() } ?: FapelloUrls.prettyName(slug),
+                    url = FapelloUrls.creator(base, slug),
+                    avatarUrl = item.jsonString("avatar"),
+                    coverUrl = item.jsonString("preview") ?: item.jsonString("avatar"),
+                    mediaCount = item.jsonInt("content_count"),
+                    likes = item.jsonInt("likes")
+                )
+            )
+        }
+        return searchResultMeta(root.asJsonObject() ?: emptyMap<String, Any?>(), out)
+    }
+
+    /**
+     * `/search_v2/?ajax=1&q=…&type=posts…` JSON -> post results.
+     * Fields per item: id, title, text, url, username, preview, likes, date.
+     */
+    public fun parseSearchPosts(json: String, base: String): SearchResult<UserPost> {
+        val root = JsonParser.parse(json).asJsonObject() ?: return SearchResult(emptyList(), 0, false, 0)
+        val list = root["results"].asJsonObject()?.jsonList("posts") ?: emptyList<Any?>()
+        val out = ArrayList<UserPost>()
+        for (entry in list) {
+            val item = entry.asJsonObject() ?: continue
+            val url = item.jsonString("url") ?: continue
+            val match = FapelloUrls.postLink(base).find(url) ?: continue
+            val id = item.jsonString("id") ?: match.groupValues[1]
+            val slug = match.groupValues[2]
+            out.add(
+                UserPost(
+                    id = id,
+                    slug = slug,
+                    title = item.jsonString("title")?.takeIf { it.isNotBlank() } ?: FapelloUrls.prettyName(slug),
+                    url = FapelloUrls.post(base, id, slug),
+                    thumbnails = listOfNotNull(item.jsonString("preview")),
+                    poster = item.jsonString("username"),
+                    likes = item.jsonInt("likes")
+                )
+            )
+        }
+        return searchResultMeta(root, out)
+    }
+
+    private fun <T> searchResultMeta(root: Map<*, *>, items: List<T>): SearchResult<T> {
+        val offset = root.jsonInt("offset") ?: 0
+        val total = root.jsonInt("total") ?: items.size
+        val hasMore = root.jsonBoolean("has_more") ?: (offset + items.size < total)
+        return SearchResult(items, total, hasMore, offset)
+    }
+
+    // ---------------------------------------------------------------- tags --
+
+    /** /tags/ index page -> the tags it lists (`<a href="/tags/{slug}/">#Name</a>`). */
+    public fun parseTags(html: String, base: String): List<TagRef> {
+        val doc = Html.parse(html)
+        val seen = LinkedHashSet<String>()
+        val out = ArrayList<TagRef>()
+        for (a in doc.select("a[href]")) {
+            val href = FapelloUrls.absolute(base, a.attr("href") ?: continue)
+            if (href.isEmpty() || !FapelloUrls.sameHost(base, href)) continue
+            val slug = TAG_LINK.matchEntire(href)?.groupValues?.get(1) ?: continue
+            if (!seen.add(slug)) continue
+            val name = a.cleanText().removePrefix("#").trim()
+                .takeIf { it.isNotBlank() } ?: FapelloUrls.prettyName(slug)
+            out.add(TagRef(slug, name))
+        }
+        return out
+    }
+
+    /** `/ajax/tags/suggest/?q=…` JSON -> `[{tag, url}]`. */
+    public fun parseTagSuggestions(json: String): List<TagRef> {
+        val list = JsonParser.parse(json) as? List<*> ?: return emptyList()
+        val out = ArrayList<TagRef>()
+        for (entry in list) {
+            val item = entry.asJsonObject() ?: continue
+            val slug = item.jsonString("url")?.takeIf { it.isNotBlank() } ?: continue
+            val rawName = item.jsonString("tag")?.takeIf { it.isNotBlank() } ?: slug
+            out.add(TagRef(slug, titleCaseWords(rawName)))
+        }
+        return out
+    }
+
+    private fun titleCaseWords(value: String): String =
+        value.split(' ', '-', '_').filter { it.isNotBlank() }
+            .joinToString(" ") { word -> word.replaceFirstChar { c -> c.uppercaseChar() } }
+
+    /**
+     * One page of a tag's media (`/tags/{slug}/` HTML and the
+     * `/ajax/tags/{slug}/page-N/` fragments share the same cards): each card's
+     * `tag-corner-link` points at the real content page `/{creator}/{id}/`,
+     * which is what we keep; the card's main `/video/…` link is just the
+     * site's player wrapper around the same item. Kind is deliberately left
+     * as IMAGE with the full-size thumb — resolving the item page (as the
+     * viewer/downloader do) is what tells photos from videos here.
+     */
+    public fun parseTagMedia(html: String, tagSlug: String, base: String): List<MediaItem> {
+        val doc = Html.parse(html)
+        val seen = LinkedHashSet<String>()
+        val out = ArrayList<MediaItem>()
+        for (corner in doc.select("a.tag-corner-link")) {
+            val href = FapelloUrls.absolute(base, corner.attr("href") ?: continue)
+            val match = CREATOR_MEDIA_LINK_ANY.matchEntire(href) ?: continue
+            val creatorSlug = match.groupValues[1]
+            val mediaId = match.groupValues[2]
+            if (!seen.add(href)) continue
+            val card = corner.closest(8) { it.select("img[src]").isNotEmpty() } ?: corner
+            val thumb = card.select("img[src]").asSequence()
+                .mapNotNull { FapelloUrls.absolute(base, it.attr("src") ?: return@mapNotNull null) }
+                .firstOrNull { it.contains("/content/") && isImageUrl(it) }
+            val creatorName = card.select("a[href]").asSequence()
+                .mapNotNull { anchor ->
+                    val link = FapelloUrls.absolute(base, anchor.attr("href") ?: return@mapNotNull null)
+                    if (FapelloUrls.CREATOR_LINK.matchEntire(link)?.groupValues?.get(1) == creatorSlug) {
+                        anchor.cleanText().takeIf { text -> text.isNotBlank() && isPlausibleName(text) }
+                    } else {
+                        null
+                    }
+                }
+                .firstOrNull() ?: FapelloUrls.prettyName(creatorSlug)
+            out.add(
+                MediaItem(
+                    id = mediaId,
+                    pageUrl = href,
+                    thumbUrl = thumb,
+                    directUrl = thumb?.let { fullSize(it) },
+                    kind = MediaKind.IMAGE,
+                    title = creatorName,
+                    owner = creatorSlug
+                )
+            )
+        }
+        return out
+    }
+
     // ------------------------------------------------------------- helpers --
 
     public fun counter(text: String, key: String): Int? {
