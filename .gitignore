@@ -11,3 +11,5 @@ local.properties
 /app/build
 /app/release
 /core/build
+build.log
+report.md
