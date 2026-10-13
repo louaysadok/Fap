@@ -8,6 +8,7 @@ import com.fap.core.FeedKind
 import com.fap.core.MediaItem
 import com.fap.core.PageResult
 import com.fap.core.UserPost
+import com.fap.app.data.AppDatabase
 import com.fap.app.di.Graph
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,4 +41,15 @@ public object Repository {
 
     public suspend fun isFavorite(slug: String): Boolean =
         withContext(Dispatchers.IO) { Graph.db.isFavorite(slug) }
+
+    public suspend fun favorites(): List<AppDatabase.Favorite> =
+        withContext(Dispatchers.IO) { Graph.db.favorites() }
+
+    public suspend fun removeFavorite(slug: String) {
+        withContext(Dispatchers.IO) { Graph.db.removeFavorite(slug) }
+    }
+
+    /** Videos only expose their real file on their own page: resolve it there. */
+    public suspend fun resolve(item: MediaItem): MediaItem =
+        withContext(Dispatchers.IO) { client().resolve(item) }
 }

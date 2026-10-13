@@ -49,7 +49,6 @@ public class MainActivity : ComponentActivity() {
                     )
                     else -> AppNav(
                         onOpenBrowser = { url -> openInBrowser(url) },
-                        onPlayVideo = { url -> openInBrowser(url) },
                         onShowLegal = { showLegal = true }
                     )
                 }

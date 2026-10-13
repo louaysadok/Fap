@@ -22,8 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -104,7 +104,7 @@ public fun CreatorScreen(
                 }
                 IconButton(onClick = viewModel::toggleFavorite) {
                     Icon(
-                        if (state.favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        if (state.favorite) Icons.Default.Star else Icons.Default.StarBorder,
                         contentDescription = "Follow",
                         tint = if (state.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )

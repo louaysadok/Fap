@@ -27,6 +27,8 @@ import com.fap.app.ui.creator.CreatorScreen
 import com.fap.app.ui.creator.CreatorViewModel
 import com.fap.app.ui.downloads.DownloadsScreen
 import com.fap.app.ui.downloads.DownloadsViewModel
+import com.fap.app.ui.following.FollowingScreen
+import com.fap.app.ui.following.FollowingViewModel
 import com.fap.app.ui.post.PostScreen
 import com.fap.app.ui.post.PostViewModel
 import com.fap.app.ui.settings.SettingsScreen
@@ -40,6 +42,7 @@ private object Routes {
     const val CREATOR = "creator/{slug}"
     const val POST = "post/{id}/{slug}"
     const val VIEWER = "viewer"
+    const val FOLLOWING = "following"
     const val DOWNLOADS = "downloads"
     const val SETTINGS = "settings"
 }
@@ -47,7 +50,6 @@ private object Routes {
 @Composable
 public fun AppNav(
     onOpenBrowser: (String) -> Unit,
-    onPlayVideo: (String) -> Unit,
     onShowLegal: () -> Unit
 ) {
     val navController = rememberNavController()
@@ -107,7 +109,17 @@ public fun AppNav(
                     viewModel = vm,
                     onOpenCreator = { slug -> navController.navigate("creator/$slug") },
                     onOpenPost = { id, slug -> navController.navigate("post/$id/$slug") },
-                    onOpenViewer = { navController.navigate(Routes.VIEWER) }
+                    onOpenViewer = { navController.navigate(Routes.VIEWER) },
+                    onOpenFollowing = { navController.navigate(Routes.FOLLOWING) }
+                )
+            }
+
+            composable(Routes.FOLLOWING) {
+                val vm: FollowingViewModel = viewModel()
+                FollowingScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenCreator = { slug -> navController.navigate("creator/$slug") }
                 )
             }
 
@@ -146,7 +158,6 @@ public fun AppNav(
             composable(Routes.VIEWER) {
                 ViewerScreen(
                     onBack = { navController.popBackStack() },
-                    onPlayVideo = onPlayVideo,
                     onDownload = { item -> enqueueViewerItem(item) }
                 )
             }
@@ -166,12 +177,22 @@ public fun AppNav(
 
 private fun enqueueViewerItem(item: com.fap.app.di.ViewerItem) {
     val owner = ownerFor(item)
+    val isVideoFile = item.source.substringBefore('?').let { path ->
+        listOf(".mp4", ".webm", ".mov", ".m4v", ".mkv").any { path.endsWith(it, ignoreCase = true) }
+    }
     val media = MediaItem(
         id = item.label,
         pageUrl = item.pageUrl ?: item.source,
         thumbUrl = item.thumb,
-        directUrl = if (item.source.startsWith("http")) item.source else null,
-        kind = if (item.source.endsWith(".mp4", true)) MediaKind.VIDEO else item.kind,
+        // For a video whose source is still its thumbnail/page, leave the
+        // direct url empty: the downloader resolves the real file from the
+        // item page, like it always has.
+        directUrl = if (item.source.startsWith("http") && (item.kind != MediaKind.VIDEO || isVideoFile)) {
+            item.source
+        } else {
+            null
+        },
+        kind = if (isVideoFile) MediaKind.VIDEO else item.kind,
         owner = owner
     )
     Graph.downloads.enqueue(listOf(media), owner)

@@ -24,8 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -66,11 +68,18 @@ public fun BrowseScreen(
     viewModel: BrowseViewModel,
     onOpenCreator: (String) -> Unit,
     onOpenPost: (String, String) -> Unit,
-    onOpenViewer: () -> Unit
+    onOpenViewer: () -> Unit,
+    onOpenFollowing: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     val settings by Graph.settings.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
+
+    // Every (re-)entry to Browse — including coming back from a creator
+    // you just followed/unfollowed — refreshes the Following count.
+    LaunchedEffect(Unit) {
+        viewModel.refreshFavorites()
+    }
 
     LaunchedEffect(Unit) {
         viewModel.nav.collect { event ->
@@ -130,14 +139,37 @@ public fun BrowseScreen(
         }
 
         if (state.mode == BrowseMode.CREATORS) {
-            TabRow(selectedTabIndex = state.feedKind.ordinal) {
-                FeedKind.entries.forEach { kind ->
-                    Tab(
-                        selected = state.feedKind == kind,
-                        onClick = { viewModel.setFeed(kind) },
-                        text = { Text(kind.label) }
-                    )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TabRow(
+                    selectedTabIndex = state.feedKind.ordinal,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    FeedKind.entries.forEach { kind ->
+                        Tab(
+                            selected = state.feedKind == kind,
+                            onClick = { viewModel.setFeed(kind) },
+                            text = { Text(kind.label) }
+                        )
+                    }
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                FilterChip(
+                    selected = false,
+                    onClick = onOpenFollowing,
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    label = { Text("Following ★ ${state.favoritesCount}", maxLines = 1) }
+                )
             }
         }
 
