@@ -295,7 +295,7 @@ private fun PostCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (post.likes != null) StatLabel("${post.likes} likes")
                     if (post.thumbnails.isNotEmpty()) StatLabel("${post.thumbnails.size}+ media")
-                    if (post.category != null) StatLabel(post.category)
+                    post.category?.let { category -> StatLabel(category) }
                 }
             }
             IconButton(onClick = onDownload) {
