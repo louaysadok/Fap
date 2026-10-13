@@ -19,6 +19,15 @@ search filters, and what "download all" means. The choice is remembered.
 - **Creators mode** — infinite grid of creators (New / Hot / Popular), media
   count, follow, tap through to a full media grid with video badges, long-press
   to multi-select, "download all" that crawls *every* page of the gallery.
+- **Following ★** — the chip next to the New / Hot / Popular tabs (with the
+  count) opens everyone you follow (star on a Creator screen): avatar, name
+  and media count, with open, download-all and unfollow per row. It re-reads
+  the `favorites` table every time it appears, so it is always current.
+- **In-app playback** — videos play inline in the full-screen viewer with
+  Media3 ExoPlayer (play/pause, scrub, mute, buffering), resolving the real
+  file from the item page first when needed, and the player is released when
+  you leave. GIFs animate in place (coil-gif). Playback never opens a
+  browser; only the "Open in browser" button on Creator/Post headers does.
 - **Posts mode** — infinite feed of user posts (title, poster, likes), tap for
   the full image set, download the whole post in one tap.
 - **Search** — filters whatever mode you are in, and doubles as a URL/slug

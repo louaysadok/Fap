@@ -102,6 +102,10 @@ public class AppDatabase(context: Context) : SQLiteOpenHelper(context, "fap.db",
         return out
     }
 
+    public fun removeFavorite(slug: String) {
+        writableDatabase.delete("favorites", "slug=?", arrayOf(slug))
+    }
+
     public fun isFavorite(slug: String): Boolean {
         readableDatabase.query("favorites", arrayOf("slug"), "slug=?", arrayOf(slug), null, null, null).use {
             return it.moveToFirst()

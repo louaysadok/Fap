@@ -38,7 +38,9 @@ public data class BrowseUiState(
     val error: String? = null,
     val query: String = "",
     val opening: Boolean = false,
-    val toast: String? = null
+    val toast: String? = null,
+    /** Followed creators (the `favorites` table), for the Following chip. */
+    val favoritesCount: Int = 0
 )
 
 public class BrowseViewModel : ViewModel() {
@@ -102,6 +104,18 @@ public class BrowseViewModel : ViewModel() {
             } finally {
                 _state.update { it.copy(loading = false, loadingMore = false) }
             }
+        }
+    }
+
+    /**
+     * Re-read the followed-creators count. Called every time the Browse
+     * screen comes back into view, so following/unfollowing a creator on
+     * its own screen is reflected here without restarting the app.
+     */
+    public fun refreshFavorites() {
+        viewModelScope.launch {
+            val count = runCatching { Repository.favorites().size }.getOrDefault(_state.value.favoritesCount)
+            _state.update { it.copy(favoritesCount = count) }
         }
     }
 
