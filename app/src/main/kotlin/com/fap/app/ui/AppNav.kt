@@ -32,6 +32,10 @@ import com.fap.app.ui.following.FollowingViewModel
 import com.fap.app.ui.post.PostScreen
 import com.fap.app.ui.post.PostViewModel
 import com.fap.app.ui.settings.SettingsScreen
+import com.fap.app.ui.tags.TagScreen
+import com.fap.app.ui.tags.TagViewModel
+import com.fap.app.ui.tags.TagsScreen
+import com.fap.app.ui.tags.TagsViewModel
 import com.fap.app.ui.settings.SettingsViewModel
 import com.fap.app.ui.viewer.ViewerScreen
 import com.fap.core.MediaItem
@@ -43,6 +47,8 @@ private object Routes {
     const val POST = "post/{id}/{slug}"
     const val VIEWER = "viewer"
     const val FOLLOWING = "following"
+    const val TAGS = "tags"
+    const val TAG = "tag/{slug}"
     const val DOWNLOADS = "downloads"
     const val SETTINGS = "settings"
 }
@@ -110,7 +116,8 @@ public fun AppNav(
                     onOpenCreator = { slug -> navController.navigate("creator/$slug") },
                     onOpenPost = { id, slug -> navController.navigate("post/$id/$slug") },
                     onOpenViewer = { navController.navigate(Routes.VIEWER) },
-                    onOpenFollowing = { navController.navigate(Routes.FOLLOWING) }
+                    onOpenFollowing = { navController.navigate(Routes.FOLLOWING) },
+                    onOpenTags = { navController.navigate(Routes.TAGS) }
                 )
             }
 
@@ -120,6 +127,29 @@ public fun AppNav(
                     viewModel = vm,
                     onBack = { navController.popBackStack() },
                     onOpenCreator = { slug -> navController.navigate("creator/$slug") }
+                )
+            }
+
+            composable(Routes.TAGS) {
+                val vm: TagsViewModel = viewModel()
+                TagsScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenTag = { slug -> navController.navigate("tag/$slug") }
+                )
+            }
+
+            composable(
+                Routes.TAG,
+                arguments = listOf(navArgument("slug") { type = NavType.StringType })
+            ) { entry ->
+                val slug = entry.arguments?.getString("slug").orEmpty()
+                val vm: TagViewModel = viewModel(factory = TagViewModel.factory(slug))
+                TagScreen(
+                    viewModel = vm,
+                    onBack = { navController.popBackStack() },
+                    onOpenViewer = { navController.navigate(Routes.VIEWER) },
+                    onOpenBrowser = onOpenBrowser
                 )
             }
 

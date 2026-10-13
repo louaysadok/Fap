@@ -30,6 +30,23 @@ public object Repository {
     public suspend fun userPosts(page: Int): PageResult<UserPost> =
         withContext(Dispatchers.IO) { client().userPosts(page) }
 
+    /** The site's own search (/search_v2 ajax), creators. Offset-paged. */
+    public suspend fun searchCreators(query: String, offset: Int): com.fap.core.SearchResult<CreatorRef> =
+        withContext(Dispatchers.IO) { client().searchCreators(query, offset = offset) }
+
+    /** The site's own search (/search_v2 ajax), user posts. Offset-paged. */
+    public suspend fun searchPosts(query: String, offset: Int): com.fap.core.SearchResult<UserPost> =
+        withContext(Dispatchers.IO) { client().searchPosts(query, offset = offset) }
+
+    public suspend fun tags(): List<com.fap.core.TagRef> =
+        withContext(Dispatchers.IO) { client().tags() }
+
+    public suspend fun tagSuggestions(query: String): List<com.fap.core.TagRef> =
+        withContext(Dispatchers.IO) { client().tagSuggestions(query) }
+
+    public suspend fun tagMedia(slug: String, page: Int): PageResult<MediaItem> =
+        withContext(Dispatchers.IO) { client().tagMedia(slug, page) }
+
     public suspend fun userPostMedia(post: UserPost): List<MediaItem> =
         withContext(Dispatchers.IO) { client().userPostMedia(post) }
 

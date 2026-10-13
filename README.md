@@ -30,9 +30,17 @@ search filters, and what "download all" means. The choice is remembered.
   browser; only the "Open in browser" button on Creator/Post headers does.
 - **Posts mode** — infinite feed of user posts (title, poster, likes), tap for
   the full image set, download the whole post in one tap.
-- **Search** — filters whatever mode you are in, and doubles as a URL/slug
-  opener (paste `https://fapello.com/some-model/`, a bare `some-model`, or a
-  post URL and it opens the right screen).
+- **Search** — runs the site's own search (`/search_v2/?ajax=1`, the JSON
+  endpoint its results page calls; it didn't exist when this app was first
+  written, so the box used to only filter loaded feed items — that found
+  almost nothing). Creators mode searches `type=models`, Posts mode
+  `type=posts`, both offset-paged with totals. Typing still narrows the
+  loaded feed instantly, pressing Search runs the real thing, and pasting a
+  URL/slug still opens it directly.
+- **Tags #** — the site has tags: a `Tags #` chip opens the `/tags/` index
+  with autocomplete (`/ajax/tags/suggest/`), and each tag has a media feed
+  (`/ajax/tags/{slug}/page-N/`) you can browse in the viewer or download in
+  full.
 - **Downloads** — queue with progress, pause / resume / cancel / retry,
   Wi-Fi-only, configurable concurrency, live notification, foreground service.
 - **Library** — because files are stored app-private (invisible to Gallery),

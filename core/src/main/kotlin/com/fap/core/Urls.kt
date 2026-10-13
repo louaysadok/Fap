@@ -27,6 +27,40 @@ public object FapelloUrls {
 
     public fun post(base: String, id: String, slug: String): String = "$base/post/$id/$slug/"
 
+    /** Percent-encode a query value (UTF-8, space as %20, like the site's JS). */
+    public fun urlEncode(value: String): String {
+        val out = StringBuilder()
+        for (byte in value.toByteArray(Charsets.UTF_8)) {
+            val c = (byte.toInt() and 0xFF).toChar()
+            if (c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9' || c == '-' || c == '_' || c == '.' || c == '~') {
+                out.append(c)
+            } else {
+                out.append('%').append(String.format("%02X", byte.toInt() and 0xFF))
+            }
+        }
+        return out.toString()
+    }
+
+    /**
+     * The site's own search, as its results page calls it:
+     * `/search_v2/?ajax=1&q=…&type=models|posts&limit=30&offset=0` -> JSON.
+     */
+    public fun search(base: String, query: String, type: String, limit: Int, offset: Int): String =
+        "$base/search_v2/?ajax=1&q=${urlEncode(query)}&type=$type&limit=$limit&offset=$offset"
+
+    /** Tag cloud / index page. */
+    public fun tags(base: String): String = "$base/tags/"
+
+    /** One tag's (HTML) page; media itself is paged through [tagAjax]. */
+    public fun tag(base: String, slug: String): String = "$base/tags/$slug/"
+
+    /** One page of a tag's media, as an HTML fragment (10 items, empty = end). */
+    public fun tagAjax(base: String, slug: String, page: Int): String = "$base/ajax/tags/$slug/page-$page/"
+
+    /** Tag autocomplete: -> `[{"tag":"ball gag","url":"ball-gag"}, …]`. */
+    public fun tagSuggest(base: String, query: String): String =
+        "$base/ajax/tags/suggest/?q=${urlEncode(query)}"
+
     /** Resolve an href found in a page to an absolute url. */
     public fun absolute(base: String, href: String): String {
         val h = href.trim()

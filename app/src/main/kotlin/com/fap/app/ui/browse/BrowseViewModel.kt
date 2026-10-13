@@ -40,7 +40,18 @@ public data class BrowseUiState(
     val opening: Boolean = false,
     val toast: String? = null,
     /** Followed creators (the `favorites` table), for the Following chip. */
-    val favoritesCount: Int = 0
+    val favoritesCount: Int = 0,
+    // ---- site search (/search_v2 ajax): what the search box actually runs --
+    /** True once a search has been submitted and its results are on screen. */
+    val inSearch: Boolean = false,
+    /** The query that produced the current search results. */
+    val searchedQuery: String = "",
+    val searchCreators: List<CreatorRef> = emptyList(),
+    val searchPosts: List<UserPost> = emptyList(),
+    val searchTotal: Int = 0,
+    val searchHasMore: Boolean = false,
+    val searchLoading: Boolean = false,
+    val searchError: String? = null
 )
 
 public class BrowseViewModel : ViewModel() {
@@ -120,10 +131,116 @@ public class BrowseViewModel : ViewModel() {
     }
 
     public fun setQuery(value: String) {
-        _state.update { it.copy(query = value) }
+        _state.update {
+            // Clearing the box leaves search and goes back to the feed.
+            if (value.isBlank() && it.inSearch) {
+                it.copy(
+                    query = value, inSearch = false, searchedQuery = "",
+                    searchCreators = emptyList(), searchPosts = emptyList(),
+                    searchTotal = 0, searchHasMore = false, searchError = null
+                )
+            } else {
+                it.copy(query = value)
+            }
+        }
+    }
+
+    /**
+     * What pressing Search does. Pasted links/full slugs still open directly;
+     * anything else runs the site's real search (`/search_v2/?ajax=1`) for the
+     * current mode instead of just filtering whatever feed pages happen to be
+     * loaded — which is why searching used to find almost nothing.
+     */
+    public fun submitSearch() {
+        val raw = _state.value.query.trim()
+        if (raw.isEmpty()) return
+        if (looksLikeLink(raw)) {
+            openRaw(raw)
+            return
+        }
+        runSearch(raw, offset = 0)
+    }
+
+    public fun loadMoreSearch() {
+        val current = _state.value
+        if (!current.inSearch || current.searchLoading || !current.searchHasMore) return
+        val offset = when (current.mode) {
+            BrowseMode.CREATORS -> current.searchCreators.size
+            BrowseMode.POSTS -> current.searchPosts.size
+        }
+        runSearch(current.searchedQuery, offset = offset)
+    }
+
+    private fun runSearch(query: String, offset: Int) {
+        val mode = _state.value.mode
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    inSearch = true,
+                    searchedQuery = query,
+                    searchLoading = true,
+                    searchError = null,
+                    searchCreators = if (offset == 0) emptyList() else it.searchCreators,
+                    searchPosts = if (offset == 0) emptyList() else it.searchPosts
+                )
+            }
+            try {
+                when (mode) {
+                    BrowseMode.CREATORS -> {
+                        val result = Repository.searchCreators(query, offset)
+                        _state.update {
+                            it.copy(
+                                searchCreators = (it.searchCreators + result.items).distinctBy { creator -> creator.slug },
+                                searchTotal = result.total,
+                                searchHasMore = result.hasMore
+                            )
+                        }
+                    }
+                    BrowseMode.POSTS -> {
+                        val result = Repository.searchPosts(query, offset)
+                        _state.update {
+                            it.copy(
+                                searchPosts = (it.searchPosts + result.items).distinctBy { post -> post.id },
+                                searchTotal = result.total,
+                                searchHasMore = result.hasMore
+                            )
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(searchError = if (offset == 0) e.message ?: "Search failed" else it.searchError)
+                }
+            } finally {
+                _state.update { it.copy(searchLoading = false) }
+            }
+        }
+    }
+
+    /** Back to browsing the feed. */
+    public fun exitSearch() {
+        _state.update {
+            it.copy(
+                inSearch = false, searchedQuery = "", query = "",
+                searchCreators = emptyList(), searchPosts = emptyList(),
+                searchTotal = 0, searchHasMore = false, searchError = null
+            )
+        }
+    }
+
+    private fun looksLikeLink(raw: String): Boolean {
+        val lower = raw.lowercase()
+        return lower.startsWith("http://") || lower.startsWith("https://") ||
+            lower.contains("fapello.com") || lower.contains("/post/") ||
+            (lower.startsWith("/") && lower.length > 2)
     }
 
     public fun setMode(mode: BrowseMode) {
+        // Search results are per-mode (models vs posts): switching modes
+        // leaves search and reloads the feed (the settings collector does it).
+        if (_state.value.inSearch) exitSearch()
         Graph.settings.update { it.copy(mode = mode) }
     }
 

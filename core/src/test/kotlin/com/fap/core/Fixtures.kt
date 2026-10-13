@@ -157,4 +157,62 @@ public object Fixtures {
 </div>
 </body></html>
 """.trimIndent()
+
+    /** Trimmed from a real /search_v2/?ajax=1&q=payton&type=models response (note the \/ escapes). */
+    public val SEARCH_MODELS_JSON: String = """
+{"success":true,"query":"payton","total":"252","has_more":true,"offset":0,"results":{"models":[{"id":"69972","name":"Payton Ramolla","url":"https:\/\/fapello.com\/payton-ramolla\/","avatar":"https:\/\/fapello.com\/content\/p\/a\/payton-ramolla\/1000\/payton-ramolla_0027.jpg","preview":"https:\/\/fapello.com\/content\/p\/a\/payton-ramolla\/3000\/payton-ramolla_2261_300px.jpg","content_count":2251,"likes":331,"comments":7,"views":1709043},{"id":"661068","name":"Payton Delu Myler","url":"https:\/\/fapello.com\/payton-delu-myler\/","avatar":"https:\/\/fapello.com\/content\/p\/a\/payton-delu-myler\/1000\/payton-delu-myler_0004.jpg","preview":"https:\/\/fapello.com\/content\/p\/a\/payton-delu-myler\/1000\/payton-delu-myler_0007_300px.jpg","content_count":6,"likes":1,"comments":0,"views":872}]},"exec_time":1.5}
+""".trimIndent()
+
+    /** Trimmed from a real /search_v2/?ajax=1&q=payton&type=posts response. */
+    public val SEARCH_POSTS_JSON: String = """
+{"success":true,"query":"payton","total":"18","has_more":true,"offset":0,"results":{"posts":[{"id":"41324","title":"Payton delulu","text":"","url":"https:\/\/fapello.com\/post\/41324\/payton-delulu\/","username":"b690987","preview":"https:\/\/fapello.com\/data\/posts\/000\/041\/324_payton-delulu_1.jpg","likes":4,"comments":2,"date":"2025-10-06 07:04:29"}]},"exec_time":1.44}
+""".trimIndent()
+
+    /** Real /ajax/tags/suggest/?q=ball response shape. */
+    public val TAG_SUGGEST_JSON: String = """
+[{"tag":"ball gag","url":"ball-gag"},{"tag":"ballerina","url":"ballerina"},{"tag":"ballet shoes","url":"ballet-shoes"}]
+""".trimIndent()
+
+    /** /tags/ index page shape: hashtag anchors. */
+    public val TAGS_INDEX_HTML: String = """
+<html><head><title>Tags - Fapello</title></head><body>
+<a href="https://fapello.com/tags/">Tags</a>
+<div class="tags-list">
+  <a href="https://fapello.com/tags/ballerina/">#Ballerina</a>
+  <a href="https://fapello.com/tags/big-tits-pov/">#Big Tits Pov</a>
+  <a href="https://cz.fapello.com/tags/ballerina/">#Ballerina</a>
+  <a href="https://fapello.com/tags/masseur/">#Masseur</a>
+</div>
+</body></html>
+""".trimIndent()
+
+    /** /ajax/tags/ballerina/page-1/ fragment shape: corner link = real content page. */
+    public val TAG_MEDIA_HTML: String = """
+<div class="mt-6 grid lg:grid-cols-3 grid-cols-2 gap-3">
+  <div>
+    <div class="bg-yellow-400 max-w-full lg:h-60 h-48 rounded-lg relative overflow-hidden shadow">
+      <a href="https://fapello.com/video/ballerina/32361855/">
+        <img src="https://fapello.com/content/c/a/carolina-guerrero/1000/carolina-guerrero_0544_300px.jpg" class="w-full h-full absolute object-cover inset-0">
+      </a>
+      <a href="https://fapello.com/carolina-guerrero/544/" class="tag-corner-link absolute top-2 right-2" title="Open content page"></a>
+      <div class="flex flex-1 items-center absolute bottom-0 w-full p-3 text-white">
+        <a href="https://fapello.com/carolina-guerrero/"><div><img src="https://fapello.com/content/c/a/carolina-guerrero/1000/carolina-guerrero_0019.jpg" class="rounded-full w-8"></div></a>
+        <a href="https://fapello.com/video/ballerina/32361855/" class="lg:flex flex-1 items-center"><div>Carolina Guerrero</div></a>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="bg-yellow-400 max-w-full lg:h-72 h-48 rounded-lg relative overflow-hidden shadow">
+      <a href="https://fapello.com/video/ballerina/32351340/">
+        <img src="https://fapello.com/content/e/l/elisamoder/1000/elisamoder_0001_300px.jpg" class="w-full h-full absolute object-cover inset-0">
+      </a>
+      <a href="https://fapello.com/elisamoder/1/" class="tag-corner-link absolute top-2 right-2" title="Open content page"></a>
+      <div class="flex flex-1 items-center absolute bottom-0 w-full p-3 text-white">
+        <a href="https://fapello.com/elisamoder/"><div><img src="https://fapello.com/content/e/l/elisamoder/1000/elisamoder_0001.jpg" class="rounded-full w-8"></div></a>
+        <a href="https://fapello.com/video/ballerina/32351340/" class="lg:flex flex-1 items-center"><div>ElisaModer</div></a>
+      </div>
+    </div>
+  </div>
+</div>
+""".trimIndent()
 }

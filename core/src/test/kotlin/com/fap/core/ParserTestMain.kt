@@ -7,6 +7,7 @@ package com.fap.core
 public fun main() {
     ParserTest.run()
     ClientTest.run()
+    SearchTagsTest.run()
     val failures = TestHarness.summary()
     if (failures != 0) {
         throw AssertionError("$failures checks failed")
